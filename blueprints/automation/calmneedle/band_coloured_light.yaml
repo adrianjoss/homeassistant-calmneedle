@@ -1,0 +1,53 @@
+blueprint:
+  name: CalmNeedle - band-coloured light
+  description: >
+    A light follows the CalmNeedle band colour: calm green, elevated amber, high orange,
+    severe red (the same colours as calmneedle.com). Informational only - it is not an alarm.
+  domain: automation
+  source_url: https://github.com/calmneedle/homeassistant-calmneedle/blob/main/blueprints/automation/calmneedle/band_coloured_light.yaml
+  input:
+    score_sensor:
+      name: CalmNeedle score sensor
+      default: sensor.calmneedle_uk
+      selector:
+        entity:
+          integration: calmneedle
+          domain: sensor
+    light:
+      name: Light
+      selector:
+        target:
+          entity:
+            domain: light
+    brightness:
+      name: Brightness (%)
+      default: 40
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+mode: restart
+
+trigger:
+  - platform: state
+    entity_id: !input score_sensor
+    attribute: band
+  - platform: homeassistant
+    event: start
+
+variables:
+  score_sensor: !input score_sensor
+  band: "{{ state_attr(score_sensor, 'band') }}"
+  colour: >
+    {{ {'calm': '#4FB286', 'elevated': '#D9A63C', 'high': '#DE7C4B', 'severe': '#D8504A'}.get(band, '#4FB286') }}
+
+action:
+  - service: light.turn_on
+    target: !input light
+    data:
+      brightness_pct: !input brightness
+      rgb_color: >
+        {% set c = colour | replace('#', '') %}
+        [{{ c[0:2] | int(base=16) }}, {{ c[2:4] | int(base=16) }}, {{ c[4:6] | int(base=16) }}]

@@ -1,0 +1,3 @@
+reset_alert:
+  name: Reset alert
+  description: Re-arm binary_sensor.calmneedle_alert from the current score.

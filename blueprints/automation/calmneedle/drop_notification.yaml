@@ -1,0 +1,50 @@
+blueprint:
+  name: CalmNeedle - drop notification
+  description: >
+    Notify when the CalmNeedle score has fallen by your chosen amount since the last reset,
+    then re-arm. Calm wording; no predictions, no advice - it links you to what moved and why.
+  domain: automation
+  source_url: https://github.com/calmneedle/homeassistant-calmneedle/blob/main/blueprints/automation/calmneedle/drop_notification.yaml
+  input:
+    alert_sensor:
+      name: CalmNeedle alert sensor
+      default: binary_sensor.calmneedle_alert
+      selector:
+        entity:
+          integration: calmneedle
+          domain: binary_sensor
+    score_sensor:
+      name: CalmNeedle score sensor
+      default: sensor.calmneedle_uk
+      selector:
+        entity:
+          integration: calmneedle
+          domain: sensor
+    notify_service:
+      name: Notify service
+      description: e.g. notify.mobile_app_my_phone
+      default: notify.notify
+      selector:
+        text:
+
+mode: single
+
+trigger:
+  - platform: state
+    entity_id: !input alert_sensor
+    to: "on"
+
+variables:
+  score_sensor: !input score_sensor
+  alert_sensor: !input alert_sensor
+
+action:
+  - service: !input notify_service
+    data:
+      title: "CalmNeedle: {{ state_attr(alert_sensor, 'reference_score') }} -> {{ states(score_sensor) }}"
+      message: >
+        Down {{ state_attr(alert_sensor, 'drop') }} since your last check
+        ({{ state_attr(score_sensor, 'band') }}).
+        {% if state_attr(alert_sensor, 'top_event') %}Largest active event: {{ state_attr(alert_sensor, 'top_event') }}.{% endif %}
+        Why it moved: https://calmneedle.com/dashboard
+  - service: calmneedle.reset_alert

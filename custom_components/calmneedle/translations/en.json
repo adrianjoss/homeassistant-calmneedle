@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "CalmNeedle",
+        "description": "A live UK stability score on your dashboard. The free option needs no account and gives the overall score. Linking a subscriber account adds categories, regions, events, the watchlist and the alert sensor.",
+        "data": { "mode": "How do you want to set this up?" }
+      },
+      "pair": {
+        "title": "Link your CalmNeedle account",
+        "description": "Open {link_url} in a browser where you are signed in to CalmNeedle and enter this code:\n\n**{code}**\n\nThe code lasts 10 minutes. When you have approved it there, press Submit.",
+        "data": {}
+      },
+      "region": {
+        "title": "Your region",
+        "description": "Regional scores describe conditions in a region, never a person. Nothing more precise than region is ever stored.",
+        "data": {
+          "home_region": "Home region",
+          "extra_regions": "Other regions to add as sensors",
+          "drop_threshold": "Alert when the score drops by at least (points)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "CalmNeedle needs re-linking",
+        "description": "The key for this device was revoked, rotated out, or the account hit its device limit. Press Submit to get a new pairing code."
+      }
+    },
+    "error": {
+      "pending": "Not approved yet. Approve the code on the website, then press Submit again."
+    },
+    "abort": {
+      "already_configured": "CalmNeedle is already set up.",
+      "cannot_connect": "Could not reach calmneedle.com.",
+      "rate_limited": "Too many attempts from this address. Try again in a few minutes.",
+      "pairing_expired": "The code expired or was already used. Start again to get a new one.",
+      "device_limit_reached": "This account already has 10 devices linked. Free a slot at https://calmneedle.com/account/api and try again.",
+      "free_no_options": "The free setup has no options. Remove it and add the integration again to link an account."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "CalmNeedle options",
+        "data": {
+          "home_region": "Home region",
+          "extra_regions": "Other regions to add as sensors",
+          "drop_threshold": "Alert when the score drops by at least (points)"
+        }
+      }
+    },
+    "abort": { "free_no_options": "The free setup has no options." }
+  },
+  "services": {
+    "reset_alert": {
+      "name": "Reset alert",
+      "description": "Re-arm binary_sensor.calmneedle_alert from the current score."
+    }
+  }
+}
