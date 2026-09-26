@@ -120,6 +120,36 @@ def test_linked_mode_sends_key_and_install_and_honours_etag():
     assert "If-None-Match" not in h1 and h2["If-None-Match"] == '"abc"'
 
 
+def test_multi_scope_is_one_request(  # tester finding B1 (26 Sep 2026)
+):
+    s = FakeSession()
+    s.add(
+        "GET",
+        "/integration/state?scopes=yorkshire,uk",
+        FakeResp(
+            200,
+            {"scopes": {"yorkshire": {"overall": 34}, "uk": {"overall": 30}}},
+            {"ETag": '"m1"'},
+        ),
+        FakeResp(304),
+    )
+    c = CalmNeedleClient(s, api_key="k", install_id="i")
+    first = run(c.states(["yorkshire", "uk"]))
+    assert first["yorkshire"]["overall"] == 34 and first["uk"]["overall"] == 30
+    assert len(s.calls) == 1  # both scopes, one request
+    second = run(c.states(["yorkshire", "uk"]))  # 304 served from cache
+    assert second == first and len(s.calls) == 2
+
+
+def test_multi_scope_free_mode_falls_back_to_public():
+    s = FakeSession()
+    s.add("GET", "/score", FakeResp(200, {"overall": 86, "band": "calm"}))
+    s.add("GET", "/score/history?hours=48", FakeResp(200, {"points": []}))
+    c = CalmNeedleClient(s)
+    st = run(c.states(["uk"]))
+    assert st["uk"]["overall"] == 86 and st["uk"]["locked"]
+
+
 def test_typed_errors():
     s = FakeSession()
     s.add("GET", "/integration/state?scope=uk", FakeResp(401, {"error": "invalid_key"}))

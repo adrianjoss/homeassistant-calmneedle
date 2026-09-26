@@ -36,13 +36,10 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self._failures = 0
         self.last_reset_score: int | None = None  # for binary_sensor.calmneedle_alert
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            update_interval=SCAN_INTERVAL
-            + timedelta(seconds=random.randint(0, STARTUP_JITTER_MAX_S)),
-        )
+        # A per-install jittered interval, kept for the life of the entry so installs stay
+        # desynchronised (tester finding B13: resetting to a flat 15 min discarded the jitter).
+        self._interval = SCAN_INTERVAL + timedelta(seconds=random.randint(0, STARTUP_JITTER_MAX_S))
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=self._interval)
 
     @property
     def primary_scope(self) -> str:
@@ -61,11 +58,11 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            states: dict[str, Any] = {}
-            for scope in self.scopes:
-                states[scope] = await self.client.state(scope)
+            # ONE request per cycle whatever the scope list (tester finding B1): the server's
+            # per-device budget is 6/hour and multi-scope answers arrive in a single call.
+            states = await self.client.states(self.scopes)
             self._failures = 0
-            self.update_interval = SCAN_INTERVAL  # jitter only on the first poll
+            self.update_interval = self._interval  # restore after any backoff, keep the jitter
             return {"scopes": states, "primary": self.primary_scope}
         except AuthError as err:
             # Revoked / suspended / rotated-out: prompt reconfiguration rather than retry forever.

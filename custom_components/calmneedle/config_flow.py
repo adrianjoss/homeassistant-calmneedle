@@ -87,6 +87,9 @@ class CalmNeedleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # --- step 2: pairing code (8.4) -----------------------------------------------------------
+    # A progress step, not a form (tester findings A3/B5/B6): the UI advances by itself the
+    # moment the code is approved on the website, errors surface instead of hanging, and the
+    # poll task is cancelled if the dialog is closed. Scripted setups no longer wedge on a form.
 
     async def async_step_pair(self, user_input: dict[str, Any] | None = None):
         client = self._client()
@@ -100,19 +103,29 @@ class CalmNeedleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._code = start["code"]
             self._poll_token = start["poll_token"]
             self._link_url = start.get("link_url", self._link_url)
+        if self._poll_task is None:
             self._poll_task = self.hass.async_create_task(self._poll_for_key(client))
+        if not self._poll_task.done():
+            return self.async_show_progress(
+                step_id="pair",
+                progress_action="wait_for_approval",
+                description_placeholders={"code": self._code, "link_url": self._link_url},
+                progress_task=self._poll_task,
+            )
+        return self.async_show_progress_done(next_step_id="pair_done")
 
-        if self._api_key is not None:
-            return await self.async_step_region()
-        if self._poll_error is not None:
-            reason, self._poll_error, self._code = self._poll_error, None, None
+    async def async_step_pair_done(self, user_input: dict[str, Any] | None = None):
+        if self._api_key is None:
+            reason = self._poll_error or "cannot_connect"
+            self._poll_error, self._code, self._poll_task = None, None, None
             return self.async_abort(reason=reason)
-        # Show the code; the form's submit button re-enters this step and checks progress.
-        return self.async_show_form(
-            step_id="pair",
-            description_placeholders={"code": self._code, "link_url": self._link_url},
-            errors={"base": "pending"} if user_input is not None else None,
-        )
+        if self.source == config_entries.SOURCE_REAUTH:
+            # Re-auth repairs the existing entry in place - same install id, same device slot,
+            # no duplicate entry (tester finding B4).
+            return self.async_update_reload_and_abort(
+                self._get_reauth_entry(), data_updates={CONF_API_KEY: self._api_key}
+            )
+        return await self.async_step_region()
 
     async def _poll_for_key(self, client: CalmNeedleClient) -> None:
         try:
@@ -123,21 +136,26 @@ class CalmNeedleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._poll_error = "device_limit_reached"
         except CalmNeedleError:
             self._poll_error = "cannot_connect"
+        except Exception:  # noqa: BLE001 - network/timeout must never hang the flow (B5)
+            self._poll_error = "cannot_connect"
 
     # --- step 3: home region (subscriber) -----------------------------------------------------
 
     async def async_step_region(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            home = user_input[CONF_HOME_REGION]
+            # The home region needs no second listing (tester finding A4).
+            extras = [s for s in user_input.get(CONF_EXTRA_REGIONS, []) if s not in (home, "uk")]
             await self.async_set_unique_id(f"{DOMAIN}-{self._install_id}")
             self._abort_if_unique_id_configured()
             return self.async_create_entry(
-                title=f"CalmNeedle ({SCOPES[user_input[CONF_HOME_REGION]]})",
+                title=f"CalmNeedle ({SCOPES[home]})",
                 data={
                     CONF_MODE: MODE_LINKED,
                     CONF_API_KEY: self._api_key,
                     CONF_INSTALL_ID: self._install_id,
-                    CONF_HOME_REGION: user_input[CONF_HOME_REGION],
-                    CONF_EXTRA_REGIONS: user_input.get(CONF_EXTRA_REGIONS, []),
+                    CONF_HOME_REGION: home,
+                    CONF_EXTRA_REGIONS: extras,
                     CONF_DROP_THRESHOLD: int(user_input.get(CONF_DROP_THRESHOLD, DEFAULT_DROP_THRESHOLD)),
                 },
             )
@@ -146,8 +164,14 @@ class CalmNeedleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # --- reauth (revoked / rotated / limit) ---------------------------------------------------
 
     async def async_step_reauth(self, entry_data: dict[str, Any]):
+        # Reuse the entry's install id so re-auth repairs the same device slot rather than
+        # binding a new device and duplicating the entry (tester finding B4).
+        existing = entry_data.get(CONF_INSTALL_ID)
+        if existing:
+            self._install_id = existing
         self._code = None
         self._api_key = None
+        self._poll_task = None
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(self, user_input: dict[str, Any] | None = None):
@@ -183,6 +207,10 @@ class CalmNeedleOptionsFlow(config_entries.OptionsFlow):
         if self.config_entry.data.get(CONF_MODE) == MODE_FREE:
             return self.async_abort(reason="free_no_options")
         if user_input is not None:
+            home = user_input.get(CONF_HOME_REGION)
+            user_input[CONF_EXTRA_REGIONS] = [
+                s for s in user_input.get(CONF_EXTRA_REGIONS, []) if s not in (home, "uk")
+            ]
             return self.async_create_entry(title="", data=user_input)
         current = {**self.config_entry.data, **self.config_entry.options}
         return self.async_show_form(step_id="init", data_schema=_region_schema(current))

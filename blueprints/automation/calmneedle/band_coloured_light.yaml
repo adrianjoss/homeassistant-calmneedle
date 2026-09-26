@@ -3,8 +3,10 @@ blueprint:
   description: >
     A light follows the CalmNeedle band colour: calm green, elevated amber, high orange,
     severe red (the same colours as calmneedle.com). Informational only - it is not an alarm.
+    By default it only recolours lights that are already on, so a band change at 3 a.m.
+    never wakes anyone.
   domain: automation
-  source_url: https://github.com/calmneedle/homeassistant-calmneedle/blob/main/blueprints/automation/calmneedle/band_coloured_light.yaml
+  source_url: https://github.com/adrianjoss/homeassistant-calmneedle/blob/main/blueprints/automation/calmneedle/band_coloured_light.yaml
   input:
     score_sensor:
       name: CalmNeedle score sensor
@@ -13,41 +15,67 @@ blueprint:
         entity:
           integration: calmneedle
           domain: sensor
-    light:
-      name: Light
+    lights:
+      name: Lights
       selector:
-        target:
-          entity:
-            domain: light
+        entity:
+          domain: light
+          multiple: true
     brightness:
-      name: Brightness (%)
+      name: Brightness (%) - used only when "turn on" is enabled below
       default: 40
       selector:
         number:
           min: 1
           max: 100
           unit_of_measurement: "%"
+    turn_on:
+      name: Turn the lights on when the band changes
+      description: >
+        Off (recommended): only lights that are already on are recoloured.
+        On: for a dedicated indicator light that should light itself up on a band change.
+      default: false
+      selector:
+        boolean:
 
 mode: restart
 
-trigger:
-  - platform: state
+triggers:
+  - trigger: state
     entity_id: !input score_sensor
     attribute: band
-  - platform: homeassistant
-    event: start
 
 variables:
   score_sensor: !input score_sensor
+  lights: !input lights
+  turn_on: !input turn_on
   band: "{{ state_attr(score_sensor, 'band') }}"
-  colour: >
-    {{ {'calm': '#4FB286', 'elevated': '#D9A63C', 'high': '#DE7C4B', 'severe': '#D8504A'}.get(band, '#4FB286') }}
+  rgb: >
+    {% set c = {'calm': '4FB286', 'elevated': 'D9A63C', 'high': 'DE7C4B', 'severe': 'D8504A'}.get(band, '4FB286') %}
+    [{{ c[0:2] | int(base=16) }}, {{ c[2:4] | int(base=16) }}, {{ c[4:6] | int(base=16) }}]
+  target_lights: >
+    {% if turn_on %}{{ lights }}{% else %}
+    {{ expand(lights) | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}
+    {% endif %}
 
-action:
-  - service: light.turn_on
-    target: !input light
-    data:
-      brightness_pct: !input brightness
-      rgb_color: >
-        {% set c = colour | replace('#', '') %}
-        [{{ c[0:2] | int(base=16) }}, {{ c[2:4] | int(base=16) }}, {{ c[4:6] | int(base=16) }}]
+conditions:
+  - condition: template
+    value_template: "{{ target_lights | length > 0 }}"
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ turn_on }}"
+    then:
+      - action: light.turn_on
+        target:
+          entity_id: "{{ target_lights }}"
+        data:
+          brightness_pct: !input brightness
+          rgb_color: "{{ rgb }}"
+    else:
+      - action: light.turn_on
+        target:
+          entity_id: "{{ target_lights }}"
+        data:
+          rgb_color: "{{ rgb }}"

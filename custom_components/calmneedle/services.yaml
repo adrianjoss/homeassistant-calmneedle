@@ -1,3 +1,7 @@
 reset_alert:
   name: Reset alert
-  description: Re-arm binary_sensor.calmneedle_alert from the current score.
+  description: Re-arm a CalmNeedle alert sensor from the current score.
+  target:
+    entity:
+      integration: calmneedle
+      domain: binary_sensor

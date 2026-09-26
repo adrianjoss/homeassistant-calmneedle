@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -61,6 +61,11 @@ class _Base(CoordinatorEntity[CalmNeedleCoordinator]):
 class ScoreSensor(_Base, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = None
+    _attr_suggested_display_precision = 0
+    # Static or bulky attributes stay out of the recorder (tester finding B9).
+    _unrecorded_attributes = frozenset(
+        {"footnotes", "disclaimer", "events", "watchlist", "history_48h", "weights"}
+    )
 
     def __init__(self, coord: CalmNeedleCoordinator, entry_id: str, scope: str) -> None:
         super().__init__(coord, entry_id)
@@ -90,6 +95,9 @@ class ScoreSensor(_Base, SensorEntity):
         if self.coordinator.client.linked:
             attrs["events"] = d.get("events", [])[:5]
             attrs["watchlist"] = d.get("watchlist", [])
+            # Category weights explain why the overall is not a simple category average
+            # (tester finding A7); published methodology data.
+            attrs["weights"] = d.get("weights")
         else:
             attrs["tier"] = "free"
         return attrs
@@ -97,6 +105,8 @@ class ScoreSensor(_Base, SensorEntity):
 
 class CategorySensor(_Base, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0  # match the whole-number overall (tester finding A7)
+    _unrecorded_attributes = frozenset({"footnote"})
 
     def __init__(self, coord: CalmNeedleCoordinator, entry_id: str, category: str) -> None:
         super().__init__(coord, entry_id)
@@ -116,6 +126,8 @@ class CategorySensor(_Base, SensorEntity):
         attrs: dict[str, Any] = {
             "delta_24h": c.get("delta_24h"),
             "scope": self.coordinator.primary_scope,
+            # Which region this category describes, spelled out (tester findings A5/B12).
+            "region": SCOPES.get(self.coordinator.primary_scope, self.coordinator.primary_scope),
             "updated_at": self._primary.get("updated_at"),
         }
         if self._cat == "civil_unrest":
@@ -125,8 +137,16 @@ class CategorySensor(_Base, SensorEntity):
         return attrs
 
 
+PREPARE_TIERS = {0: "none", 1: "nudge", 2: "official_instruction"}
+
+
 class PrepareTierSensor(_Base, SensorEntity):
+    """Enum sensor (tester finding B11): dashboards and voice read "nudge", not a bare 1."""
+
     _attr_icon = "mdi:home-alert-outline"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(PREPARE_TIERS.values())
+    _unrecorded_attributes = frozenset({"note"})
 
     def __init__(self, coord: CalmNeedleCoordinator, entry_id: str) -> None:
         super().__init__(coord, entry_id)
@@ -135,14 +155,19 @@ class PrepareTierSensor(_Base, SensorEntity):
         self._attr_suggested_object_id = "calmneedle_prepare_tier"
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> str | None:
         v = self._primary.get("prepare_tier")
-        return int(v) if v is not None else None
+        return PREPARE_TIERS.get(int(v)) if v is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
+            "tier_number": self._primary.get("prepare_tier"),
             "official_source_url": self._primary.get("prepare_source_url"),
             "scope": self.coordinator.primary_scope,
-            "note": "0 = nothing active; 1 = a quiet nudge; 2 = an official instruction is in force.",
+            "note": (
+                "none = nothing active; nudge = official general guidance is highlighted; "
+                "official_instruction = a government instruction is in force - the source link "
+                "is in official_source_url."
+            ),
         }

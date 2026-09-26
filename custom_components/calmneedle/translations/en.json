@@ -8,8 +8,7 @@
       },
       "pair": {
         "title": "Link your CalmNeedle account",
-        "description": "Open {link_url} in a browser where you are signed in to CalmNeedle and enter this code:\n\n**{code}**\n\nThe code lasts 10 minutes. When you have approved it there, press Submit.",
-        "data": {}
+        "description": "Open {link_url} in a browser where you are signed in to CalmNeedle and enter this code:\n\n**{code}**\n\nThe code lasts 10 minutes. This screen moves on by itself the moment you approve it."
       },
       "region": {
         "title": "Your region",
@@ -25,16 +24,17 @@
         "description": "The key for this device was revoked, rotated out, or the account hit its device limit. Press Submit to get a new pairing code."
       }
     },
-    "error": {
-      "pending": "Not approved yet. Approve the code on the website, then press Submit again."
+    "progress": {
+      "wait_for_approval": "Open {link_url} in a browser where you are signed in to CalmNeedle and enter this code:\n\n**{code}**\n\nThe code lasts 10 minutes. This screen moves on by itself the moment you approve it."
     },
     "abort": {
       "already_configured": "CalmNeedle is already set up.",
       "cannot_connect": "Could not reach calmneedle.com.",
       "rate_limited": "Too many attempts from this address. Try again in a few minutes.",
       "pairing_expired": "The code expired or was already used. Start again to get a new one.",
-      "device_limit_reached": "This account already has 10 devices linked. Free a slot at https://calmneedle.com/account/api and try again.",
-      "free_no_options": "The free setup has no options. Remove it and add the integration again to link an account."
+      "device_limit_reached": "This account has no free device slots. Free one at https://calmneedle.com/account/api and try again.",
+      "free_no_options": "The free setup has no options. Remove it and add the integration again to link an account.",
+      "reauth_successful": "Re-linked successfully."
     }
   },
   "options": {

@@ -19,25 +19,25 @@ Every entity carries an `attribution` attribute naming CalmNeedle and linking th
 
 ## The device limit, stated up front
 
-A subscription covers **ten devices**. A Home Assistant instance is *one* device however many phones, tablets or wall panels display it — HA makes one call per cycle on behalf of all of them. A second HA instance, a script, a Grafana panel or a Node-RED flow each use another slot. You can see and revoke devices at https://calmneedle.com/account/api. A key posted publicly fills its ten slots almost immediately and then fails for everyone, including whoever leaked it — that is deliberate.
+A subscription covers **ten devices**; a free account covers **three** (UK sensor only). A Home Assistant instance is *one* device however many phones, tablets or wall panels display it — HA makes one call per cycle on behalf of all of them. A second HA instance, a script, a Grafana panel or a Node-RED flow each use another slot. You can see and revoke devices at https://calmneedle.com/account/api. A key posted publicly fills its ten slots almost immediately and then fails for everyone, including whoever leaked it — that is deliberate.
 
 ## Install
 
 **One click:** https://calmneedle.com/homeassistant — the *Install* button opens HACS on your own instance with this repository pre-filled; *Add integration* opens the setup dialog.
 
-**By hand:** HACS → Integrations → ⋮ → Custom repositories → add `https://github.com/calmneedle/homeassistant-calmneedle` (category *Integration*) → install → restart → Settings → Devices & services → Add integration → CalmNeedle.
+**By hand:** HACS → Integrations → ⋮ → Custom repositories → add `https://github.com/adrianjoss/homeassistant-calmneedle` (category *Integration*) → install → restart → Settings → Devices & services → Add integration → CalmNeedle.
 
 ## Setup
 
 1. Choose **Continue free** (overall score only, no account) or **Link my account**.
-2. Linking shows a six-character code. Open https://calmneedle.com/link while signed in, enter the code, check the region and slot count, approve. Press *Submit* in HA — the key arrives on its own; you never see or type it.
+2. Linking shows a six-character code. Open https://calmneedle.com/link while signed in, enter the code, check the region and slot count, approve. The HA screen moves on by itself the moment you approve — the key arrives on its own; you never see or type it.
 3. Pick your home region (and any extras) and an alert threshold.
 
 If you see *"This account already has 10 devices linked"*, free a slot on the website and try again. If a key is rotated or revoked, HA asks you to re-link.
 
 ## Polling discipline
 
-One request every 15 minutes (the score cannot change faster), with a 0–60 s startup jitter so installs don't align on the quarter-hour. On failure the interval backs off 15 → 30 → 60 minutes and entities go *unavailable* rather than holding stale values. ETags are honoured. Six requests an hour per device is the server-side ceiling.
+One request every 15 minutes covers every configured region in a single call (the score cannot change faster), with a per-install 0–60 s jitter so installs don't align on the quarter-hour. On failure the interval backs off 15 → 30 → 60 minutes and entities go *unavailable* rather than holding stale values. ETags are honoured. Six requests an hour per device is the server-side ceiling.
 
 ## Example automations
 

@@ -11,7 +11,7 @@ from typing import Any
 
 from .const import DEFAULT_BASE_URL, INSTALL_HEADER
 
-USER_AGENT = "homeassistant-calmneedle/0.1.0 (+https://calmneedle.com)"
+USER_AGENT = "homeassistant-calmneedle/1.0.1 (+https://calmneedle.com)"
 
 
 class CalmNeedleError(Exception):
@@ -114,6 +114,15 @@ class CalmNeedleClient:
         if not self.linked:
             return await self.free_state()
         return await self._get(f"/integration/state?scope={scope}", keyed=True)
+
+    async def states(self, scopes: list[str]) -> dict[str, dict[str, Any]]:
+        """All scopes in ONE request (?scopes=a,b) - the device budget is 6 requests/hour,
+        so a 15-minute cycle must never cost more than one request (tester finding B1)."""
+        if not self.linked:
+            return {"uk": await self.free_state()}
+        joined = ",".join(scopes)
+        body = await self._get(f"/integration/state?scopes={joined}", keyed=True)
+        return body.get("scopes", {})
 
     async def devices(self) -> dict[str, Any]:
         return await self._get("/integration/devices", keyed=True)
