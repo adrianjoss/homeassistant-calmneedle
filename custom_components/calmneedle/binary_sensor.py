@@ -37,7 +37,6 @@ class AlertBinarySensor(CoordinatorEntity[CalmNeedleCoordinator], BinarySensorEn
     def __init__(self, coord: CalmNeedleCoordinator, entry_id: str) -> None:
         super().__init__(coord)
         self._attr_unique_id = f"{entry_id}-alert"
-        self._attr_suggested_object_id = "calmneedle_alert"
         self._attr_device_info = _device(entry_id)
 
     @property

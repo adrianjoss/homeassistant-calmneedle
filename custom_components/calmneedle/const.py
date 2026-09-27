@@ -46,6 +46,24 @@ SCOPES = {
     "south-west": "South West",
 }
 CATEGORIES = ("security", "economy", "political", "civil_unrest", "health", "climate")
+
+# Rough centroids of the twelve ITL1 regions/nations, used ONLY to pre-select the home-region
+# dropdown from HA's own configured location (tester finding A4). Nothing is ever sent to the
+# server: the comparison happens locally and the user can pick anything.
+REGION_CENTROIDS = {
+    "scotland": (56.5, -4.2),
+    "northern-ireland": (54.6, -6.7),
+    "north-east": (54.95, -1.9),
+    "north-west": (54.0, -2.7),
+    "yorkshire": (53.9, -1.2),
+    "wales": (52.4, -3.8),
+    "west-midlands": (52.5, -2.1),
+    "east-midlands": (52.9, -0.9),
+    "east-of-england": (52.2, 0.4),
+    "london": (51.51, -0.12),
+    "south-east": (51.3, -0.9),
+    "south-west": (50.8, -3.6),
+}
 CIVIL_UNREST_FOOTNOTE = (
     "* Includes signals from public trending topics (capped) alongside reported events; "
     "see the methodology page."

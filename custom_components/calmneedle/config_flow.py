@@ -36,6 +36,7 @@ from .const import (
     DOMAIN,
     MODE_FREE,
     MODE_LINKED,
+    REGION_CENTROIDS,
     SCOPES,
 )
 
@@ -159,7 +160,10 @@ class CalmNeedleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_DROP_THRESHOLD: int(user_input.get(CONF_DROP_THRESHOLD, DEFAULT_DROP_THRESHOLD)),
                 },
             )
-        return self.async_show_form(step_id="region", data_schema=_region_schema())
+        return self.async_show_form(
+            step_id="region",
+            data_schema=_region_schema({CONF_HOME_REGION: _nearest_region(self.hass)}),
+        )
 
     # --- reauth (revoked / rotated / limit) ---------------------------------------------------
 
@@ -183,6 +187,25 @@ class CalmNeedleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
         return CalmNeedleOptionsFlow()
+
+
+def _nearest_region(hass: Any) -> str:
+    """Default the home-region dropdown to the region nearest HA's configured location
+    (tester finding A4). Purely local - coordinates never leave the machine."""
+    import math
+
+    lat = getattr(hass.config, "latitude", None)
+    lon = getattr(hass.config, "longitude", None)
+    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        return "uk"
+    if not (49.5 <= lat <= 61.0 and -9.0 <= lon <= 2.5):  # outside the UK: no guess
+        return "uk"
+    scale = math.cos(math.radians(lat))
+    return min(
+        REGION_CENTROIDS,
+        key=lambda r: (REGION_CENTROIDS[r][0] - lat) ** 2
+        + ((REGION_CENTROIDS[r][1] - lon) * scale) ** 2,
+    )
 
 
 def _region_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:

@@ -72,7 +72,6 @@ class ScoreSensor(_Base, SensorEntity):
         self._scope = scope
         self._attr_unique_id = f"{entry_id}-score-{scope}"
         self._attr_name = "UK" if scope == "uk" else SCOPES.get(scope, scope)
-        self._attr_suggested_object_id = f"calmneedle_{scope.replace('-', '_')}"
 
     @property
     def native_value(self) -> int | None:
@@ -113,7 +112,6 @@ class CategorySensor(_Base, SensorEntity):
         self._cat = category
         self._attr_unique_id = f"{entry_id}-cat-{category}"
         self._attr_name = category.replace("_", " ").title() + ("*" if category == "civil_unrest" else "")
-        self._attr_suggested_object_id = f"calmneedle_{category}"
 
     @property
     def native_value(self) -> float | None:
@@ -152,7 +150,6 @@ class PrepareTierSensor(_Base, SensorEntity):
         super().__init__(coord, entry_id)
         self._attr_unique_id = f"{entry_id}-prepare-tier"
         self._attr_name = "Prepare tier"
-        self._attr_suggested_object_id = "calmneedle_prepare_tier"
 
     @property
     def native_value(self) -> str | None:

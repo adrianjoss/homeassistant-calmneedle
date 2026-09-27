@@ -25,9 +25,11 @@ for _name in (
     "homeassistant.helpers",
     "homeassistant.helpers.aiohttp_client",
     "homeassistant.helpers.update_coordinator",
+    "homeassistant.helpers.storage",
     "homeassistant.exceptions",
 ):
     sys.modules.setdefault(_name, types.ModuleType(_name))
+sys.modules["homeassistant.helpers.storage"].Store = object  # type: ignore[attr-defined]
 sys.modules["homeassistant.config_entries"].ConfigEntry = object  # type: ignore[attr-defined]
 sys.modules["homeassistant.const"].Platform = types.SimpleNamespace(SENSOR="sensor", BINARY_SENSOR="binary_sensor")  # type: ignore[attr-defined]
 sys.modules["homeassistant.core"].HomeAssistant = object  # type: ignore[attr-defined]

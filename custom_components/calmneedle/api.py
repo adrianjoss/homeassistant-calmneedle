@@ -11,7 +11,7 @@ from typing import Any
 
 from .const import DEFAULT_BASE_URL, INSTALL_HEADER
 
-USER_AGENT = "homeassistant-calmneedle/1.0.1 (+https://calmneedle.com)"
+USER_AGENT = "homeassistant-calmneedle/1.0.2 (+https://calmneedle.com)"
 
 
 class CalmNeedleError(Exception):
