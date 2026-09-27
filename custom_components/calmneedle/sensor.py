@@ -64,7 +64,7 @@ class ScoreSensor(_Base, SensorEntity):
     _attr_suggested_display_precision = 0
     # Static or bulky attributes stay out of the recorder (tester finding B9).
     _unrecorded_attributes = frozenset(
-        {"footnotes", "disclaimer", "events", "watchlist", "history_48h", "weights"}
+        {"footnotes", "disclaimer", "events", "watchlist", "history_48h", "weights", "aggregation"}
     )
 
     def __init__(self, coord: CalmNeedleCoordinator, entry_id: str, scope: str) -> None:
@@ -94,9 +94,11 @@ class ScoreSensor(_Base, SensorEntity):
         if self.coordinator.client.linked:
             attrs["events"] = d.get("events", [])[:5]
             attrs["watchlist"] = d.get("watchlist", [])
-            # Category weights explain why the overall is not a simple category average
-            # (tester finding A7); published methodology data.
+            # Category weights + the full aggregation (min-blend, damping, rounding rule)
+            # explain why the overall is not a simple category average and let anyone
+            # reproduce the published score (tester findings A7 + round 3).
             attrs["weights"] = d.get("weights")
+            attrs["aggregation"] = d.get("aggregation")
         else:
             attrs["tier"] = "free"
         return attrs
