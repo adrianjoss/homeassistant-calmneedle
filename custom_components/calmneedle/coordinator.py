@@ -43,6 +43,7 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._store = store
         self._failures = 0
         self.last_reset_score: int | None = None  # for binary_sensor.calmneedle_alert
+        self._reauth_prompted = False
         # A per-install jittered interval, kept for the life of the entry so installs stay
         # desynchronised (tester finding B13: resetting to a flat 15 min discarded the jitter).
         self._interval = SCAN_INTERVAL + timedelta(seconds=random.randint(0, STARTUP_JITTER_MAX_S))
@@ -72,6 +73,16 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.update_interval = self._interval  # restore after any backoff, keep the jitter
             data = {"scopes": states, "primary": self.primary_scope}
             await self._save_cache(data)
+            if self.client.key_superseded_until and not self._reauth_prompted:
+                # The key was rotated on the website; paired devices never see keys, so ask
+                # for a re-link NOW while the old key still works (dies at the given time),
+                # instead of a silent outage in 7 days (tester finding, 28 Sep 2026).
+                self._reauth_prompted = True
+                _LOGGER.warning(
+                    "CalmNeedle key was rotated on the website; re-link before %s",
+                    self.client.key_superseded_until,
+                )
+                self.entry.async_start_reauth(self.hass)
             return data
         except AuthError as err:
             # Revoked / suspended / rotated-out: prompt reconfiguration rather than retry forever.

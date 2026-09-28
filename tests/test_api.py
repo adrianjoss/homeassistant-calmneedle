@@ -143,6 +143,19 @@ def test_multi_scope_is_one_request(  # tester finding B1 (26 Sep 2026)
     assert second == first and len(s.calls) == 2
 
 
+def test_superseded_key_header_is_captured():  # rotation finding, 28 Sep 2026
+    s = FakeSession()
+    s.add(
+        "GET",
+        "/integration/state?scope=uk",
+        FakeResp(200, {"overall": 30}, {"X-CalmNeedle-Key-Superseded": "2026-10-05T09:00:00+00:00"}),
+    )
+    c = CalmNeedleClient(s, api_key="k", install_id="i")
+    assert c.key_superseded_until is None
+    run(c.state("uk"))
+    assert c.key_superseded_until == "2026-10-05T09:00:00+00:00"
+
+
 def test_multi_scope_free_mode_falls_back_to_public():
     s = FakeSession()
     s.add("GET", "/score", FakeResp(200, {"overall": 86, "band": "calm"}))

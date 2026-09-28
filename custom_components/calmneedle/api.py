@@ -11,7 +11,7 @@ from typing import Any
 
 from .const import DEFAULT_BASE_URL, INSTALL_HEADER
 
-USER_AGENT = "homeassistant-calmneedle/1.0.3 (+https://calmneedle.com)"
+USER_AGENT = "homeassistant-calmneedle/1.0.4 (+https://calmneedle.com)"
 
 
 class CalmNeedleError(Exception):
@@ -55,6 +55,10 @@ class CalmNeedleClient:
         self._install = install_id
         self._etag: dict[str, str] = {}
         self._cache: dict[str, dict[str, Any]] = {}
+        # Set from X-CalmNeedle-Key-Superseded: this key was rotated out on the website and
+        # dies at the given ISO time; the integration should prompt a re-link now, while the
+        # old key still works (tester finding, 28 Sep 2026).
+        self.key_superseded_until: str | None = None
 
     @property
     def linked(self) -> bool:
@@ -74,6 +78,8 @@ class CalmNeedleClient:
         if path in self._etag:
             headers["If-None-Match"] = self._etag[path]
         async with self._session.get(url, headers=headers, timeout=20) as resp:
+            if keyed:
+                self.key_superseded_until = resp.headers.get("X-CalmNeedle-Key-Superseded")
             if resp.status == 304 and path in self._cache:
                 return self._cache[path]
             if resp.status == 429:
