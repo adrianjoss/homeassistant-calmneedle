@@ -37,7 +37,7 @@ If you see *"This account already has 10 devices linked"*, free a slot on the we
 
 ## Polling discipline
 
-One request every 15 minutes covers every configured region in a single call (the score cannot change faster), with a per-install 0–60 s jitter so installs don't align on the quarter-hour. On failure the interval backs off 15 → 30 → 60 minutes and entities go *unavailable* rather than holding stale values. ETags are honoured. Six requests an hour per device is the server-side ceiling.
+One request every 15 minutes covers every configured region in a single call (the score cannot change faster), with a per-install 0–60 s jitter so installs don't align on the quarter-hour. Failures that never reached the server (DNS stalls, failed connects) spend none of the budget and retry within 90 seconds; failures that did are retried on a 15 → 30 → 60 minute back-off. Entities keep their last values through short gaps and only go *unavailable* once the data is older than two poll intervals. ETags are honoured. Six requests an hour per device is the server-side ceiling.
 
 ## Example automations
 

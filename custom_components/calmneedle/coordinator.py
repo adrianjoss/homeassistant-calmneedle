@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -42,6 +43,8 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self._store = store
         self._failures = 0
+        self._net_retries = 0  # quick-retry counter for failures that never reached the server
+        self._last_ok: float | None = None  # monotonic time of the last successful poll
         self.last_reset_score: int | None = None  # for binary_sensor.calmneedle_alert
         self._reauth_prompted = False
         # A per-install jittered interval, kept for the life of the entry so installs stay
@@ -70,6 +73,8 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # per-device budget is 6/hour and multi-scope answers arrive in a single call.
             states = await self.client.states(self.scopes)
             self._failures = 0
+            self._net_retries = 0
+            self._last_ok = time.monotonic()
             self.update_interval = self._interval  # restore after any backoff, keep the jitter
             data = {"scopes": states, "primary": self.primary_scope}
             await self._save_cache(data)
@@ -97,21 +102,46 @@ class CalmNeedleCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # ladder for real failures.
             self.update_interval = max(timedelta(seconds=err.retry_after), timedelta(minutes=1))
             _LOGGER.warning("CalmNeedle rate limited; retrying in %ss", err.retry_after)
-            if self.data is not None:
-                return self.data
-            raise UpdateFailed(f"rate limited, retry in {err.retry_after}s") from err
+            return self._grace_or_fail(f"rate limited, retry in {err.retry_after}s")
         except CalmNeedleError as err:
             self._backoff()
-            raise UpdateFailed(str(err)) from err
-        except Exception as err:  # noqa: BLE001 - network errors etc.
+            return self._grace_or_fail(str(err))
+        except OSError as err:
+            # DNS stalls and failed connects never reached the server, so they spend none of
+            # the request budget: retry quickly (twice) before falling back to the ladder
+            # (tester finding, 30 Sep 2026 - a 2 s resolver blip cost 15 dark minutes).
+            self._net_retries += 1
+            if self._net_retries <= 2:
+                self.update_interval = timedelta(seconds=90)
+                _LOGGER.warning(
+                    "CalmNeedle poll never left the house (%s); quick retry in 90 s", err
+                )
+            else:
+                self._backoff()
+            return self._grace_or_fail(f"network: {err}")
+        except Exception as err:  # noqa: BLE001 - anything else unexpected
             self._backoff()
-            raise UpdateFailed(f"request failed: {err}") from err
+            return self._grace_or_fail(f"request failed: {err}")
+
+    def _grace_or_fail(self, reason: str) -> dict[str, Any]:
+        """Keep the last good data through short outages (tester finding, 30 Sep 2026).
+
+        A 15-minute-old score is still a score; "unavailable" is louder than one failed poll
+        deserves. Entities only go unavailable once the data is older than two poll intervals.
+        """
+        fresh_enough = (
+            self.data is not None
+            and self._last_ok is not None
+            and time.monotonic() - self._last_ok < 2 * self._interval.total_seconds()
+        )
+        if fresh_enough:
+            _LOGGER.warning("CalmNeedle poll failed (%s); keeping last good data", reason)
+            return self.data
+        raise UpdateFailed(reason)
 
     async def _save_cache(self, data: dict[str, Any]) -> None:
         """Persist the last good payload so a restart can skip its startup request (B13/#3)."""
         if self._store is not None:
-            import time
-
             await self._store.async_save({"ts": time.time(), "data": data})
 
     def _backoff(self) -> None:
